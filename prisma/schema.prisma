@@ -1,0 +1,165 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+enum OrderStatus {
+  PENDING
+  PROCESSING
+  SHIPPED
+  DELIVERED
+  CANCELLED
+  RETURNED
+}
+
+enum OrderPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum IncidentSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum IncidentStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  URGENT
+}
+
+enum TaskStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  CANCELLED
+}
+
+enum MachineStatus {
+  OPERATIONAL
+  MAINTENANCE
+  DOWN
+}
+
+enum ActionStatus {
+  PENDING
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+}
+
+model Customer {
+  id        String   @id @default(cuid())
+  name      String
+  email     String   @unique
+  phone     String?
+  createdAt DateTime @default(now())
+  orders    Order[]
+
+  @@index([email])
+}
+
+model Order {
+  id               String      @id @default(cuid())
+  customerId       String
+  status           OrderStatus @default(PENDING)
+  priority         OrderPriority @default(MEDIUM)
+  totalAmount      Float
+  expectedDelivery DateTime
+  actualDelivery   DateTime?
+  createdAt        DateTime    @default(now())
+  updatedAt        DateTime    @updatedAt
+  customer         Customer    @relation(fields: [customerId], references: [id])
+
+  @@index([customerId])
+  @@index([status])
+  @@index([priority])
+}
+
+model InventoryItem {
+  id           String   @id @default(cuid())
+  name         String
+  sku          String   @unique
+  quantity     Int
+  reorderLevel Int
+  location     String
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([sku])
+}
+
+model Machine {
+  id              String        @id @default(cuid())
+  name            String
+  location        String
+  status          MachineStatus @default(OPERATIONAL)
+  lastMaintenance DateTime?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+  incidents       Incident[]
+
+  @@index([status])
+}
+
+model Incident {
+  id          String           @id @default(cuid())
+  machineId   String?
+  title       String
+  description String
+  severity    IncidentSeverity @default(MEDIUM)
+  status      IncidentStatus   @default(OPEN)
+  createdAt   DateTime         @default(now())
+  resolvedAt  DateTime?
+  machine     Machine?         @relation(fields: [machineId], references: [id])
+
+  @@index([machineId])
+  @@index([status])
+  @@index([severity])
+}
+
+model Task {
+  id          String       @id @default(cuid())
+  title       String
+  description String?
+  priority    TaskPriority @default(MEDIUM)
+  status      TaskStatus   @default(PENDING)
+  assignedTo  String?
+  dueDate     DateTime?
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  @@index([status])
+  @@index([priority])
+  @@index([assignedTo])
+}
+
+model ActionLog {
+  id         String       @id @default(cuid())
+  action     String
+  entityType String
+  entityId   String
+  status     ActionStatus @default(PENDING)
+  details    Json?
+  createdAt  DateTime     @default(now())
+
+  @@index([entityType, entityId])
+  @@index([status])
+  @@index([createdAt])
+}
