@@ -13,8 +13,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "OPERO - AI Work Operator",
-  description: "Voice-first AI operator for business workflow automation",
+  title: "OPERO — Universal AI Operator",
+  description: "Voice-controlled universal computer operator",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
