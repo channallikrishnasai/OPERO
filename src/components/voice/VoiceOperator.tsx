@@ -2,6 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from 'react';
 import { SYSTEM_PROMPT, getAssemblyAITools, VOICE_AGENT_CONFIG } from '@/lib/voice/agent-config';
+import { ApprovalPanel } from './ApprovalPanel';
 
 export type VoiceState =
   | 'IDLE'
@@ -15,7 +16,7 @@ export type VoiceState =
 export interface ToolActivity {
   id: string;
   toolName: string;
-  status: 'started' | 'completed' | 'failed';
+  status: 'started' | 'completed' | 'failed' | 'waiting_approval';
   summary: string;
   timestamp: Date;
 }
@@ -24,6 +25,13 @@ export interface TranscriptEntry {
   role: 'user' | 'agent';
   text: string;
   timestamp: Date;
+}
+
+interface PendingApproval {
+  approvalId: string;
+  toolName: string;
+  description: string;
+  callId: string;
 }
 
 interface VoiceOperatorProps {
@@ -43,6 +51,7 @@ export function VoiceOperator({
   const [transcript, setTranscript] = useState<TranscriptEntry[]>([]);
   const [toolActivities, setToolActivities] = useState<ToolActivity[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [pendingApproval, setPendingApproval] = useState<PendingApproval | null>(null);
 
   const wsRef = useRef<WebSocket | null>(null);
   const audioContextRef = useRef<AudioContext | null>(null);
@@ -143,6 +152,7 @@ export function VoiceOperator({
   const handleWebSocketMessage = useCallback(
     (event: MessageEvent) => {
       const msg = JSON.parse(event.data);
+      console.log('[VoiceOperator] WebSocket event:', msg.type, JSON.stringify(msg).slice(0, 200));
 
       switch (msg.type) {
         case 'session.ready':
@@ -215,6 +225,12 @@ export function VoiceOperator({
           break;
 
         case 'tool.call': {
+          console.log('[VoiceOperator] tool.call received:', {
+            call_id: msg.call_id,
+            name: msg.name,
+            arguments: msg.arguments,
+          });
+
           const toolActivity: ToolActivity = {
             id: msg.call_id,
             toolName: msg.name,
@@ -225,34 +241,73 @@ export function VoiceOperator({
           addToolActivity(toolActivity);
           updateState('THINKING');
 
+          const requestBody = {
+            tool: msg.name,
+            input: msg.arguments,
+          };
+          console.log('[VoiceOperator] POST /api/tools request:', requestBody);
+
           fetch('/api/tools', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              tool: msg.name,
-              input: msg.arguments,
-            }),
+            body: JSON.stringify(requestBody),
           })
-            .then((response) => response.json())
+            .then((response) => {
+              console.log('[VoiceOperator] /api/tools response status:', response.status);
+              return response.json();
+            })
             .then((result) => {
-              const completedActivity: ToolActivity = {
-                ...toolActivity,
-                status: result.success ? 'completed' : 'failed',
-                summary: result.success
-                  ? `${msg.name}: ${Array.isArray(result.data) ? result.data.length + ' results' : 'completed'}`
-                  : `${msg.name}: ${result.error?.message || 'failed'}`,
-              };
-              addToolActivity(completedActivity);
+              console.log('[VoiceOperator] /api/tools result:', JSON.stringify(result).slice(0, 500));
 
-              wsRef.current?.send(
-                JSON.stringify({
+              if (result.requiresApproval) {
+                const approvalActivity: ToolActivity = {
+                  ...toolActivity,
+                  status: 'waiting_approval',
+                  summary: `${msg.name}: Waiting for approval`,
+                };
+                addToolActivity(approvalActivity);
+
+                setPendingApproval({
+                  approvalId: result.approvalId,
+                  toolName: result.action,
+                  description: result.description,
+                  callId: msg.call_id,
+                });
+
+                const toolResult = {
+                  type: 'tool.result',
+                  call_id: msg.call_id,
+                  result: JSON.stringify({
+                    success: false,
+                    requiresApproval: true,
+                    approvalId: result.approvalId,
+                    description: result.description,
+                    message: result.message,
+                  }),
+                };
+                console.log('[VoiceOperator] Sending tool.result (approval):', toolResult);
+                wsRef.current?.send(JSON.stringify(toolResult));
+              } else {
+                const completedActivity: ToolActivity = {
+                  ...toolActivity,
+                  status: result.success ? 'completed' : 'failed',
+                  summary: result.success
+                    ? `${msg.name}: ${Array.isArray(result.data) ? result.data.length + ' results' : 'completed'}`
+                    : `${msg.name}: ${result.error?.message || 'failed'}`,
+                };
+                addToolActivity(completedActivity);
+
+                const toolResult = {
                   type: 'tool.result',
                   call_id: msg.call_id,
                   result: JSON.stringify(result),
-                })
-              );
+                };
+                console.log('[VoiceOperator] Sending tool.result:', toolResult);
+                wsRef.current?.send(JSON.stringify(toolResult));
+              }
             })
-            .catch(() => {
+            .catch((err) => {
+              console.error('[VoiceOperator] /api/tools fetch error:', err);
               const failedActivity: ToolActivity = {
                 ...toolActivity,
                 status: 'failed',
@@ -290,6 +345,7 @@ export function VoiceOperator({
     });
     scheduledSourcesRef.current.clear();
     playbackTimeRef.current = 0;
+    setPendingApproval(null);
     if (wsRef.current?.readyState === WebSocket.OPEN) {
       wsRef.current.send(JSON.stringify({ type: 'session.end' }));
     }
@@ -299,6 +355,22 @@ export function VoiceOperator({
       updateState('IDLE');
     }, 500);
   }, [updateState, cleanup]);
+
+  const handleApprovalResolved = useCallback((approvalId: string, status: string) => {
+    if (pendingApproval && pendingApproval.approvalId === approvalId) {
+      const completedActivity: ToolActivity = {
+        id: pendingApproval.callId,
+        toolName: pendingApproval.toolName,
+        status: status === 'APPROVED' ? 'completed' : 'failed',
+        summary: status === 'APPROVED'
+          ? `${pendingApproval.toolName}: Approved and executed`
+          : `${pendingApproval.toolName}: Rejected`,
+        timestamp: new Date(),
+      };
+      addToolActivity(completedActivity);
+      setPendingApproval(null);
+    }
+  }, [pendingApproval, addToolActivity]);
 
   const startVoice = useCallback(async () => {
     setError(null);
@@ -392,19 +464,20 @@ export function VoiceOperator({
 
       ws.onopen = () => {
         const tools = getAssemblyAITools();
-        ws.send(
-          JSON.stringify({
-            type: 'session.update',
-            session: {
-              system_prompt: SYSTEM_PROMPT,
-              greeting: VOICE_AGENT_CONFIG.greeting,
-              output: {
-                voice: VOICE_AGENT_CONFIG.voice.voice_id,
-              },
-              tools: tools,
+        const sessionUpdate = {
+          type: 'session.update',
+          session: {
+            system_prompt: SYSTEM_PROMPT,
+            greeting: VOICE_AGENT_CONFIG.greeting,
+            output: {
+              voice: VOICE_AGENT_CONFIG.voice.voice_id,
             },
-          })
-        );
+            tools: tools,
+          },
+        };
+        console.log('[VoiceOperator] Sending session.update with', tools.length, 'tools');
+        console.log('[VoiceOperator] Tool names:', tools.map(t => t.name).join(', '));
+        ws.send(JSON.stringify(sessionUpdate));
       };
 
       ws.onmessage = handleWebSocketMessage;
@@ -515,7 +588,7 @@ export function VoiceOperator({
       )}
 
       {toolActivities.length > 0 && (
-        <div>
+        <div className="mb-4">
           <h3 className="text-sm font-medium text-slate-500 mb-2">Tool Activity</h3>
           <div className="max-h-32 overflow-y-auto space-y-1">
             {toolActivities.map((activity) => (
@@ -527,6 +600,8 @@ export function VoiceOperator({
                   className={`w-2 h-2 rounded-full ${
                     activity.status === 'started'
                       ? 'bg-yellow-400 animate-pulse'
+                      : activity.status === 'waiting_approval'
+                      ? 'bg-amber-400 animate-pulse'
                       : activity.status === 'completed'
                       ? 'bg-green-400'
                       : 'bg-red-400'
@@ -539,6 +614,8 @@ export function VoiceOperator({
           </div>
         </div>
       )}
+
+      <ApprovalPanel onApprovalResolved={handleApprovalResolved} />
     </div>
   );
 }

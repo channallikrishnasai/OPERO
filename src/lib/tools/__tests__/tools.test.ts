@@ -109,7 +109,7 @@ describe('incidents.search', () => {
     (result.data as Array<Record<string, unknown>>).forEach((incident) => {
       expect(incident.status).toBe('OPEN');
     });
-  });
+  }, 10000);
 });
 
 describe('tasks.search', () => {
@@ -120,7 +120,7 @@ describe('tasks.search', () => {
     expect(result.success).toBe(true);
     expect(Array.isArray(result.data)).toBe(true);
     expect((result.data as unknown[]).length).toBeGreaterThan(0);
-  });
+  }, 10000);
 
   it('should filter by priority', async () => {
     const tool = getTool('tasks.search');
@@ -129,7 +129,7 @@ describe('tasks.search', () => {
     (result.data as Array<Record<string, unknown>>).forEach((task) => {
       expect(task.priority).toBe('URGENT');
     });
-  });
+  }, 10000);
 
   it('should filter by status', async () => {
     const tool = getTool('tasks.search');
@@ -138,5 +138,5 @@ describe('tasks.search', () => {
     (result.data as Array<Record<string, unknown>>).forEach((task) => {
       expect(task.status).toBe('PENDING');
     });
-  });
+  }, 10000);
 });

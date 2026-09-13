@@ -64,6 +64,13 @@ enum ActionStatus {
   FAILED
 }
 
+enum ApprovalStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  EXPIRED
+}
+
 model Customer {
   id        String   @id @default(cuid())
   name      String
@@ -83,6 +90,7 @@ model Order {
   totalAmount      Float
   expectedDelivery DateTime
   actualDelivery   DateTime?
+  assignedTo       String?
   createdAt        DateTime    @default(now())
   updatedAt        DateTime    @updatedAt
   customer         Customer    @relation(fields: [customerId], references: [id])
@@ -161,5 +169,21 @@ model ActionLog {
 
   @@index([entityType, entityId])
   @@index([status])
+  @@index([createdAt])
+}
+
+model Approval {
+  id          String         @id @default(cuid())
+  toolName    String
+  toolInput   Json
+  description String
+  riskLevel   String
+  status      ApprovalStatus @default(PENDING)
+  callId      String?
+  createdAt   DateTime       @default(now())
+  resolvedAt  DateTime?
+
+  @@index([status])
+  @@index([callId])
   @@index([createdAt])
 }
