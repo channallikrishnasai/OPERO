@@ -89,20 +89,37 @@ function ParticleNetwork() {
     function init() {
       particles = [];
       const numberOfParticles = Math.floor(
-        (canvas!.height * canvas!.width) / 8500
+        (canvas!.height * canvas!.width) / 9000
       );
+      const cx = canvas!.width / 2;
+      const cy = canvas!.height / 2;
+      const safeRadius = Math.min(canvas!.width, canvas!.height) * 0.28;
+
       for (let i = 0; i < numberOfParticles; i++) {
-        const size = Math.random() * 1.8 + 0.8;
-        const x = Math.random() * (canvas!.width - size * 2) + size * 2;
-        const y = Math.random() * (canvas!.height - size * 2) + size * 2;
-        const directionX = Math.random() * 0.35 - 0.175;
-        const directionY = Math.random() * 0.35 - 0.175;
+        const size = Math.random() * 1.6 + 0.6;
+        let x = Math.random() * (canvas!.width - size * 2) + size * 2;
+        let y = Math.random() * (canvas!.height - size * 2) + size * 2;
+
+        /* Reduce density near center hero zone */
+        const dx = x - cx;
+        const dy = y - cy;
+        const distFromCenter = Math.sqrt(dx * dx + dy * dy);
+        if (distFromCenter < safeRadius && Math.random() > 0.15) {
+          /* Place 85% of center-landing particles toward edges */
+          const angle = Math.random() * Math.PI * 2;
+          const edgeR = safeRadius + Math.random() * (Math.min(canvas!.width, canvas!.height) * 0.35);
+          x = cx + Math.cos(angle) * edgeR;
+          y = cy + Math.sin(angle) * edgeR;
+        }
+
+        const directionX = Math.random() * 0.3 - 0.15;
+        const directionY = Math.random() * 0.3 - 0.15;
 
         const colors = [
-          "rgba(130, 120, 255, 0.7)",
-          "rgba(102, 126, 234, 0.7)",
-          "rgba(140, 130, 255, 0.6)",
-          "rgba(160, 140, 255, 0.5)",
+          "rgba(120, 110, 255, 0.9)",
+          "rgba(102, 126, 234, 0.85)",
+          "rgba(130, 120, 255, 0.82)",
+          "rgba(150, 135, 255, 0.78)",
         ];
         const color = colors[Math.floor(Math.random() * colors.length)];
 
@@ -140,9 +157,9 @@ function ParticleNetwork() {
             );
 
             if (mouse.x && distMouseA < mouse.radius) {
-              ctx!.strokeStyle = `rgba(200, 190, 255, ${opacityValue * 0.6})`;
+              ctx!.strokeStyle = `rgba(170, 160, 255, ${opacityValue * 0.8})`;
             } else {
-              ctx!.strokeStyle = `rgba(130, 120, 255, ${opacityValue * 0.35})`;
+              ctx!.strokeStyle = `rgba(120, 110, 255, ${opacityValue * 0.48})`;
             }
 
             ctx!.lineWidth = 0.8;
@@ -232,31 +249,41 @@ export default function Home() {
       {/* Particle Network Background */}
       <ParticleNetwork />
 
-      {/* Subtle radial gradient overlay */}
+      {/* Vignette safe zone — clears center for hero readability */}
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
           background:
-            "radial-gradient(ellipse at 50% 45%, rgba(102, 126, 234, 0.04), transparent 60%)",
+            "radial-gradient(ellipse 55% 55% at 50% 46%, rgba(3, 3, 8, 0.85) 0%, rgba(3, 3, 8, 0.4) 50%, transparent 75%)",
+        }}
+      />
+
+      {/* AI focal glow — subtle atmospheric convergence */}
+      <div
+        className="absolute inset-0 pointer-events-none"
+        style={{
+          background:
+            "radial-gradient(circle at 50% 44%, rgba(102, 126, 234, 0.06) 0%, rgba(80, 70, 180, 0.02) 30%, transparent 55%)",
         }}
       />
 
       {/* Hero Content */}
-      <div className="relative z-10 text-center px-6 max-w-2xl mx-auto">
+      <div className="relative z-10 text-center px-6 max-w-xl mx-auto">
         {/* Badge */}
         <motion.div
           custom={0}
           variants={fadeUpVariants}
           initial="hidden"
           animate="visible"
-          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-8"
+          className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full mb-7"
           style={{
-            background: "rgba(102, 126, 234, 0.08)",
-            border: "1px solid rgba(102, 126, 234, 0.15)",
+            background: "rgba(102, 126, 234, 0.1)",
+            border: "1px solid rgba(102, 126, 234, 0.18)",
+            backdropFilter: "blur(12px)",
           }}
         >
-          <Zap className="h-3.5 w-3.5 text-indigo-400" />
-          <span className="text-[11px] font-medium tracking-wider text-indigo-300/80 uppercase">
+          <Zap className="h-3 w-3 text-indigo-400" />
+          <span className="text-[10px] font-medium tracking-[0.15em] text-indigo-300/90 uppercase">
             AI Computer Operator
           </span>
         </motion.div>
@@ -267,13 +294,14 @@ export default function Home() {
           variants={fadeUpVariants}
           initial="hidden"
           animate="visible"
-          className="text-6xl md:text-8xl lg:text-9xl font-bold tracking-tighter mb-6"
+          className="text-5xl md:text-7xl lg:text-8xl font-bold tracking-[0.04em] mb-5"
           style={{
             background:
-              "linear-gradient(180deg, #ffffff 0%, rgba(255,255,255,0.5) 100%)",
+              "linear-gradient(180deg, #ffffff 20%, rgba(200, 200, 220, 0.65) 100%)",
             WebkitBackgroundClip: "text",
             WebkitTextFillColor: "transparent",
             backgroundClip: "text",
+            textShadow: "none",
           }}
         >
           OPERO
@@ -285,7 +313,7 @@ export default function Home() {
           variants={fadeUpVariants}
           initial="hidden"
           animate="visible"
-          className="text-lg md:text-xl text-white/50 mb-4 font-light"
+          className="text-base md:text-lg text-white/70 mb-3 font-normal tracking-wide"
         >
           Your voice. Your command. Your computer.
         </motion.p>
@@ -296,7 +324,7 @@ export default function Home() {
           variants={fadeUpVariants}
           initial="hidden"
           animate="visible"
-          className="text-sm text-white/30 mb-10 max-w-lg mx-auto leading-relaxed"
+          className="text-[13px] text-white/40 mb-8 max-w-md mx-auto leading-relaxed"
         >
           Control your browser with natural voice commands. OPERO listens,
           understands, plans, acts, and verifies.
@@ -311,10 +339,10 @@ export default function Home() {
         >
           <button
             onClick={() => setShowOperator(true)}
-            className="group px-8 py-3.5 bg-white text-black font-semibold rounded-lg transition-all duration-300 hover:shadow-[0_0_30px_rgba(255,255,255,0.15)] active:scale-[0.97] flex items-center gap-2.5 mx-auto"
+            className="group px-7 py-3 bg-white text-black text-sm font-semibold rounded-lg transition-all duration-300 hover:shadow-[0_0_24px_rgba(255,255,255,0.12)] hover:brightness-105 active:scale-[0.97] flex items-center gap-2 mx-auto"
           >
             Start OPERO
-            <ArrowRight className="h-4 w-4 transition-transform duration-300 group-hover:translate-x-0.5" />
+            <ArrowRight className="h-3.5 w-3.5 transition-transform duration-300 group-hover:translate-x-0.5" />
           </button>
         </motion.div>
 
@@ -324,7 +352,7 @@ export default function Home() {
           variants={fadeUpVariants}
           initial="hidden"
           animate="visible"
-          className="text-[11px] text-white/15 mt-5 tracking-wide"
+          className="text-[11px] text-white/20 mt-4 tracking-wide"
         >
           Say &quot;Hey OPERO&quot; to begin
         </motion.p>
