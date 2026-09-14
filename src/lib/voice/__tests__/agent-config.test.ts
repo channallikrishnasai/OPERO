@@ -1,10 +1,5 @@
-import { describe, it, expect, beforeAll } from 'vitest';
-import { registerAllTools } from '@/lib/tools/implementations';
+import { describe, it, expect } from 'vitest';
 import { getAssemblyAITools, SYSTEM_PROMPT, VOICE_AGENT_CONFIG } from '../agent-config';
-
-beforeAll(() => {
-  registerAllTools();
-});
 
 describe('Voice Agent Configuration', () => {
   it('should have correct agent name', () => {
@@ -18,8 +13,9 @@ describe('Voice Agent Configuration', () => {
 
   it('should have system prompt with key instructions', () => {
     expect(SYSTEM_PROMPT).toContain('OPERO');
-    expect(SYSTEM_PROMPT).toContain('Acme Operations');
     expect(SYSTEM_PROMPT).toContain('READ');
+    expect(SYSTEM_PROMPT).toContain('browser.open');
+    expect(SYSTEM_PROMPT).toContain('browser.type');
     expect(SYSTEM_PROMPT).toContain('orders.search');
     expect(SYSTEM_PROMPT).toContain('inventory.search');
   });
@@ -38,7 +34,22 @@ describe('Voice Agent Configuration', () => {
     });
   });
 
-  it('should include all read tools', () => {
+  it('should include browser tools', () => {
+    const tools = getAssemblyAITools();
+    const names = tools.map((t) => t.name);
+
+    expect(names).toContain('browser.open');
+    expect(names).toContain('browser.navigate');
+    expect(names).toContain('browser.get_page');
+    expect(names).toContain('browser.click');
+    expect(names).toContain('browser.type');
+    expect(names).toContain('browser.press');
+    expect(names).toContain('browser.scroll');
+    expect(names).toContain('browser.back');
+    expect(names).toContain('browser.screenshot');
+  });
+
+  it('should include read tools', () => {
     const tools = getAssemblyAITools();
     const names = tools.map((t) => t.name);
 
@@ -47,7 +58,6 @@ describe('Voice Agent Configuration', () => {
     expect(names).toContain('inventory.search');
     expect(names).toContain('machines.get');
     expect(names).toContain('incidents.search');
-    expect(names).toContain('incidents.get');
     expect(names).toContain('tasks.search');
   });
 

@@ -10,9 +10,15 @@ describe('Permission Engine', () => {
       expect(result.requiresApproval).toBe(false);
     });
 
-    it('should not allow SUGGEST', () => {
-      const result = checkPermission(ToolPermission.SUGGEST);
+    it('should require approval for SUGGEST when no existing approval', () => {
+      const result = checkPermission(ToolPermission.SUGGEST, false);
       expect(result.allowed).toBe(false);
+      expect(result.requiresApproval).toBe(true);
+    });
+
+    it('should allow SUGGEST when existing approval', () => {
+      const result = checkPermission(ToolPermission.SUGGEST, true);
+      expect(result.allowed).toBe(true);
       expect(result.requiresApproval).toBe(false);
     });
 
@@ -40,8 +46,8 @@ describe('Permission Engine', () => {
       expect(needsApproval(ToolPermission.READ)).toBe(false);
     });
 
-    it('should return false for SUGGEST', () => {
-      expect(needsApproval(ToolPermission.SUGGEST)).toBe(false);
+    it('should return true for SUGGEST', () => {
+      expect(needsApproval(ToolPermission.SUGGEST)).toBe(true);
     });
 
     it('should return true for APPROVE', () => {

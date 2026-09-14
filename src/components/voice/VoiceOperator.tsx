@@ -62,6 +62,7 @@ export function VoiceOperator({
   const scheduledSourcesRef = useRef<Set<AudioBufferSourceNode>>(new Set());
   const readyRef = useRef(false);
   const sourceRef = useRef<MediaStreamAudioSourceNode | null>(null);
+  const processedCallsRef = useRef<Set<string>>(new Set());
 
   const ASSEMBLYAI_SAMPLE_RATE = 24000;
 
@@ -100,6 +101,7 @@ export function VoiceOperator({
       try { s.stop(); } catch {}
     });
     scheduledSourcesRef.current.clear();
+    processedCallsRef.current.clear();
     mediaStreamRef.current = null;
     audioContextRef.current = null;
     audioWorkletNodeRef.current = null;
@@ -170,10 +172,12 @@ export function VoiceOperator({
 
         case 'session.ended':
           readyRef.current = false;
+          processedCallsRef.current.clear();
           updateState('DISCONNECTED');
           break;
 
         case 'transcript.user.delta':
+          if (state === 'SPEAKING') break;
           if (msg.text) {
             addTranscript({
               role: 'user',
@@ -194,6 +198,7 @@ export function VoiceOperator({
           break;
 
         case 'reply.started':
+          if (state === 'IDLE' || state === 'ERROR' || state === 'DISCONNECTED') break;
           updateState('SPEAKING');
           playbackTimeRef.current = 0;
           break;
@@ -205,6 +210,7 @@ export function VoiceOperator({
           break;
 
         case 'reply.done':
+          if (state !== 'SPEAKING' && state !== 'THINKING') break;
           if (msg.status === 'interrupted') {
             scheduledSourcesRef.current.forEach((s) => {
               try { s.stop(); } catch {}
@@ -225,6 +231,16 @@ export function VoiceOperator({
           break;
 
         case 'tool.call': {
+          if (state !== 'LISTENING' && state !== 'THINKING' && state !== 'SPEAKING') {
+            console.log('[VoiceOperator] Ignoring tool.call in state:', state);
+            break;
+          }
+          if (processedCallsRef.current.has(msg.call_id)) {
+            console.log('[VoiceOperator] Ignoring duplicate tool.call:', msg.call_id);
+            break;
+          }
+          processedCallsRef.current.add(msg.call_id);
+
           console.log('[VoiceOperator] tool.call received:', {
             call_id: msg.call_id,
             name: msg.name,
@@ -330,6 +346,14 @@ export function VoiceOperator({
         }
 
         case 'input.speech.started':
+          if (state === 'SPEAKING') {
+            scheduledSourcesRef.current.forEach((s) => {
+              try { s.stop(); } catch {}
+            });
+            scheduledSourcesRef.current.clear();
+            playbackTimeRef.current = 0;
+            updateState('LISTENING');
+          }
           break;
 
         case 'input.speech.stopped':
@@ -356,7 +380,7 @@ export function VoiceOperator({
     }, 500);
   }, [updateState, cleanup]);
 
-  const handleApprovalResolved = useCallback((approvalId: string, status: string) => {
+  const handleApprovalResolved = useCallback((approvalId: string, status: string, toolResult?: unknown) => {
     if (pendingApproval && pendingApproval.approvalId === approvalId) {
       const completedActivity: ToolActivity = {
         id: pendingApproval.callId,
@@ -368,6 +392,17 @@ export function VoiceOperator({
         timestamp: new Date(),
       };
       addToolActivity(completedActivity);
+
+      if (status === 'APPROVED' && wsRef.current?.readyState === WebSocket.OPEN) {
+        const resultPayload = {
+          type: 'tool.result',
+          call_id: pendingApproval.callId,
+          result: JSON.stringify(toolResult ?? { success: true, data: { approved: true } }),
+        };
+        console.log('[VoiceOperator] Sending tool.result after approval:', resultPayload);
+        wsRef.current.send(JSON.stringify(resultPayload));
+      }
+
       setPendingApproval(null);
     }
   }, [pendingApproval, addToolActivity]);

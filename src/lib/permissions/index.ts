@@ -17,7 +17,10 @@ export function checkPermission(
       return { allowed: true, requiresApproval: false };
 
     case ToolPermission.SUGGEST:
-      return { allowed: false, requiresApproval: false, reason: 'SUGGEST tools require user confirmation but do not need formal approval.' };
+      if (hasExistingApproval) {
+        return { allowed: true, requiresApproval: false };
+      }
+      return { allowed: false, requiresApproval: true, reason: 'SUGGEST tools require user confirmation before execution.' };
 
     case ToolPermission.APPROVE:
       if (hasExistingApproval) {
@@ -34,7 +37,7 @@ export function checkPermission(
 }
 
 export function needsApproval(permission: PermissionLevel): boolean {
-  return permission === ToolPermission.APPROVE;
+  return permission === ToolPermission.APPROVE || permission === ToolPermission.SUGGEST;
 }
 
 export function canAutoExecute(permission: PermissionLevel): boolean {

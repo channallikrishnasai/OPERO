@@ -15,7 +15,7 @@ export interface ApprovalRequest {
 }
 
 interface ApprovalPanelProps {
-  onApprovalResolved?: (approvalId: string, status: string) => void;
+  onApprovalResolved?: (approvalId: string, status: string, toolResult?: unknown) => void;
 }
 
 export function ApprovalPanel({ onApprovalResolved }: ApprovalPanelProps) {
@@ -50,7 +50,7 @@ export function ApprovalPanel({ onApprovalResolved }: ApprovalPanelProps) {
       const data = await response.json();
       if (data.success) {
         setApprovals((prev) => prev.filter((a) => a.id !== approvalId));
-        onApprovalResolved?.(approvalId, 'APPROVED');
+        onApprovalResolved?.(approvalId, 'APPROVED', data.data?.toolResult);
       } else {
         setError(data.error?.message || 'Failed to approve');
       }

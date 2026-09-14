@@ -11,6 +11,16 @@ import { incidentsGetTool } from './incidents.get';
 import { tasksSearchTool } from './tasks.search';
 import { tasksCreateTool } from './tasks.create';
 import { tasksUpdateTool } from './tasks.update';
+import { browserOpenTool } from './browser.open';
+import { browserNavigateTool } from './browser.navigate';
+import { browserGetPageTool } from './browser.get_page';
+import { browserClickTool } from './browser.click';
+import { browserTypeTool } from './browser.type';
+import { browserPressTool } from './browser.press';
+import { browserScrollTool } from './browser.scroll';
+import { browserBackTool } from './browser.back';
+import { browserScreenshotTool } from './browser.screenshot';
+import { browserExtractTool } from './browser.extract';
 
 export function registerAllTools(): void {
   registerTool(ordersSearchTool);
@@ -25,6 +35,16 @@ export function registerAllTools(): void {
   registerTool(tasksSearchTool);
   registerTool(tasksCreateTool);
   registerTool(tasksUpdateTool);
+  registerTool(browserOpenTool);
+  registerTool(browserNavigateTool);
+  registerTool(browserGetPageTool);
+  registerTool(browserClickTool);
+  registerTool(browserTypeTool);
+  registerTool(browserPressTool);
+  registerTool(browserScrollTool);
+  registerTool(browserBackTool);
+  registerTool(browserScreenshotTool);
+  registerTool(browserExtractTool);
 }
 
 export {
@@ -40,6 +60,16 @@ export {
   tasksSearchTool,
   tasksCreateTool,
   tasksUpdateTool,
+  browserOpenTool,
+  browserNavigateTool,
+  browserGetPageTool,
+  browserClickTool,
+  browserTypeTool,
+  browserPressTool,
+  browserScrollTool,
+  browserBackTool,
+  browserScreenshotTool,
+  browserExtractTool,
 };
 
 export { getToolNames } from '../registry';
